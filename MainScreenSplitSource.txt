@@ -1,0 +1,876 @@
+﻿===== .\app\src\main\kotlin\com\example\twsestockapp\ui\main\MainScreenViewModel.kt =====
+package com.example.twsestockapp.ui.main
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.twsestockapp.data.DataRepository
+import com.example.twsestockapp.data.model.Stock
+import com.example.twsestockapp.data.selection.StockFieldSelection
+import com.example.twsestockapp.data.selection.StockFieldSelectionRepository
+import com.example.twsestockapp.data.selection.StockSelection
+import com.example.twsestockapp.data.selection.StockSelectionRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+/**
+ * Default implementation of [MainScreenViewModelContract].
+ *
+ * Combines:
+ *
+ * - complete TWSE stock data
+ * - persistent ordered stock selections
+ * - persistent ordered Pager-field selections
+ *
+ * into one unified [MainScreenUiState].
+ */
+class MainScreenViewModel(
+    dataRepository: DataRepository,
+    private val stockSelectionRepository:
+        StockSelectionRepository,
+    private val stockFieldSelectionRepository:
+        StockFieldSelectionRepository,
+) : ViewModel(), MainScreenViewModelContract {
+
+    /**
+     * Combined presentation-state stream.
+     *
+     * The explicit Flow<MainScreenUiState> type is important here.
+     *
+     * Without it, Kotlin can infer the combine result as
+     * Flow<MainScreenUiState.Success>, which would prevent catch from
+     * emitting MainScreenUiState.Error.
+     */
+    private val combinedUiState:
+        Flow<MainScreenUiState> =
+        combine(
+            dataRepository.data,
+            stockSelectionRepository.selections,
+            stockFieldSelectionRepository.selections,
+        ) {
+                allStocks,
+                selections,
+                fieldSelections ->
+
+            createSuccessState(
+                allStocks =
+                    allStocks,
+                selections =
+                    selections,
+                fieldSelections =
+                    fieldSelections,
+            )
+        }
+
+    /**
+     * Complete observable presentation state.
+     */
+    override val uiState:
+        StateFlow<MainScreenUiState> =
+        combinedUiState
+            .catch { throwable ->
+                emit(
+                    MainScreenUiState.Error(
+                        throwable =
+                            throwable,
+                    )
+                )
+            }
+            .stateIn(
+                scope =
+                    viewModelScope,
+                started =
+                    SharingStarted
+                        .WhileSubscribed(5000),
+                initialValue =
+                    MainScreenUiState.Loading,
+            )
+
+    override fun selectStock(
+        code: String,
+    ) {
+        viewModelScope.launch {
+            stockSelectionRepository.select(
+                code =
+                    code,
+            )
+        }
+    }
+
+    override fun unselectStock(
+        code: String,
+    ) {
+        viewModelScope.launch {
+            stockSelectionRepository.unselect(
+                code =
+                    code,
+            )
+        }
+    }
+
+    override fun moveStockForward(
+        code: String,
+    ) {
+        viewModelScope.launch {
+            stockSelectionRepository.moveForward(
+                code =
+                    code,
+            )
+        }
+    }
+
+    override fun moveStockBackward(
+        code: String,
+    ) {
+        viewModelScope.launch {
+            stockSelectionRepository.moveBackward(
+                code =
+                    code,
+            )
+        }
+    }
+
+    override fun clearSelectedStocks() {
+        viewModelScope.launch {
+            stockSelectionRepository.clear()
+        }
+    }
+
+    /**
+     * Adds one field to the persistent Pager configuration.
+     */
+    override fun selectStockField(
+        fieldKey: String,
+    ) {
+        viewModelScope.launch {
+            stockFieldSelectionRepository.select(
+                fieldKey =
+                    fieldKey,
+            )
+        }
+    }
+
+    /**
+     * Removes one field from the persistent Pager configuration.
+     */
+    override fun unselectStockField(
+        fieldKey: String,
+    ) {
+        viewModelScope.launch {
+            stockFieldSelectionRepository.unselect(
+                fieldKey =
+                    fieldKey,
+            )
+        }
+    }
+
+    /**
+     * Moves one Pager field toward the beginning.
+     */
+    override fun moveStockFieldForward(
+        fieldKey: String,
+    ) {
+        viewModelScope.launch {
+            stockFieldSelectionRepository.moveForward(
+                fieldKey =
+                    fieldKey,
+            )
+        }
+    }
+
+    /**
+     * Moves one Pager field toward the end.
+     */
+    override fun moveStockFieldBackward(
+        fieldKey: String,
+    ) {
+        viewModelScope.launch {
+            stockFieldSelectionRepository.moveBackward(
+                fieldKey =
+                    fieldKey,
+            )
+        }
+    }
+
+    /**
+     * Replaces the complete persistent Pager-field configuration.
+     */
+    override fun replaceStockFields(
+        fieldKeys: List<String>,
+    ) {
+        viewModelScope.launch {
+            stockFieldSelectionRepository.replaceAll(
+                fieldKeys =
+                    fieldKeys,
+            )
+        }
+    }
+
+    /**
+     * Creates presentation state from stock data and both ordered
+     * selection collections.
+     */
+    private fun createSuccessState(
+        allStocks: List<Stock>,
+        selections: List<StockSelection>,
+        fieldSelections: List<StockFieldSelection>,
+    ): MainScreenUiState.Success {
+
+        val stocksByCode =
+            allStocks.associateBy { stock ->
+                stock.Code
+            }
+
+        val orderedSelections =
+            selections.sortedBy { selection ->
+                selection.DisplayOrder
+            }
+
+        val visibleStocks =
+            orderedSelections.mapNotNull { selection ->
+                stocksByCode[
+                    selection.Code
+                ]
+            }
+
+        val orderedFieldSelections =
+            fieldSelections.sortedBy { selection ->
+                selection.DisplayOrder
+            }
+
+        return MainScreenUiState.Success(
+            allStocks =
+                allStocks,
+            visibleStocks =
+                visibleStocks,
+            selections =
+                orderedSelections,
+            fieldSelections =
+                orderedFieldSelections,
+            showSelectionPanel =
+                orderedSelections.isEmpty(),
+        )
+    }
+}
+
+
+===== .\app\src\main\kotlin\com\example\twsestockapp\ui\main\MainScreen.kt =====
+package com.example.twsestockapp.ui.main
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation3.runtime.NavKey
+import com.example.twse.stock.R
+import com.example.twsestockapp.TWSEStockApplication
+import com.example.twsestockapp.ui.main.component.StockList
+import com.example.twsestockapp.ui.main.selection.StockSelectionPanel
+
+/**
+ * Route-level entry point for the main stock screen.
+ *
+ * Production dependencies are obtained from [TWSEStockApplication].
+ * UI events are forwarded through [MainScreenViewModelContract].
+ */
+@Composable
+fun MainScreen(
+    onItemClick: (NavKey) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val application =
+        LocalContext.current.applicationContext
+            as TWSEStockApplication
+
+    val container =
+        application.container
+
+    val viewModel:
+        MainScreenViewModelContract =
+        viewModel {
+            MainScreenViewModel(
+                dataRepository =
+                    container.dataRepository,
+                stockSelectionRepository =
+                    container.stockSelectionRepository,
+                stockFieldSelectionRepository =
+                    container.stockFieldSelectionRepository,
+            )
+        }
+
+    val uiState by
+        viewModel.uiState
+            .collectAsStateWithLifecycle()
+
+    var editorRequested by
+        rememberSaveable {
+            mutableStateOf(false)
+        }
+
+    when (val state = uiState) {
+
+        MainScreenUiState.Loading -> {
+            MainScreenLoading(
+                modifier =
+                    modifier,
+            )
+        }
+
+        is MainScreenUiState.Success -> {
+            val showEditor =
+                state.showSelectionPanel ||
+                    editorRequested
+
+            MainScreenContent(
+                state =
+                    state,
+                showSelectionEditor =
+                    showEditor,
+                onOpenSelectionEditor = {
+                    editorRequested =
+                        true
+                },
+                onCloseSelectionEditor = {
+                    if (
+                        state.selections.isNotEmpty()
+                    ) {
+                        editorRequested =
+                            false
+                    }
+                },
+                onSelect = { code ->
+                    /*
+                     * Keep the editor open after the first selection.
+                     */
+                    editorRequested =
+                        true
+
+                    viewModel.selectStock(
+                        code =
+                            code,
+                    )
+                },
+                onUnselect = { code ->
+                    viewModel.unselectStock(
+                        code =
+                            code,
+                    )
+                },
+                onMoveForward = { code ->
+                    viewModel.moveStockForward(
+                        code =
+                            code,
+                    )
+                },
+                onMoveBackward = { code ->
+                    viewModel.moveStockBackward(
+                        code =
+                            code,
+                    )
+                },
+                modifier =
+                    modifier,
+            )
+        }
+
+        is MainScreenUiState.Error -> {
+            MainScreenError(
+                throwable =
+                    state.throwable,
+                modifier =
+                    modifier,
+            )
+        }
+    }
+}
+
+/**
+ * Renders a successful main-screen state.
+ *
+ * Field-selection UI will be added after the field editor and top-right
+ * menu are introduced.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun MainScreenContent(
+    state: MainScreenUiState.Success,
+    showSelectionEditor: Boolean,
+    onOpenSelectionEditor: () -> Unit,
+    onCloseSelectionEditor: () -> Unit,
+    onSelect: (String) -> Unit,
+    onUnselect: (String) -> Unit,
+    onMoveForward: (String) -> Unit,
+    onMoveBackward: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(
+        modifier =
+            modifier,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text =
+                            if (
+                                showSelectionEditor
+                            ) {
+                                "編輯自選股票"
+                            } else {
+                                stringResource(
+                                    R.string.app_name
+                                )
+                            }
+                    )
+                },
+                actions = {
+                    if (
+                        showSelectionEditor
+                    ) {
+                        TextButton(
+                            onClick =
+                                onCloseSelectionEditor,
+                            enabled =
+                                state.selections
+                                    .isNotEmpty(),
+                        ) {
+                            Text(
+                                text = "完成"
+                            )
+                        }
+                    }
+                },
+                colors =
+                    TopAppBarDefaults
+                        .topAppBarColors(
+                            containerColor =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primaryContainer,
+                            titleContentColor =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primary,
+                        ),
+            )
+        },
+        floatingActionButton = {
+            if (
+                !showSelectionEditor
+            ) {
+                FloatingActionButton(
+                    onClick =
+                        onOpenSelectionEditor,
+                    modifier =
+                        Modifier.semantics {
+                            contentDescription =
+                                "編輯自選股票"
+                        },
+                ) {
+                    Text(
+                        text = "編輯"
+                    )
+                }
+            }
+        },
+    ) { innerPadding ->
+
+        if (
+            showSelectionEditor
+        ) {
+            StockSelectionPanel(
+                stocks =
+                    state.allStocks,
+                selections =
+                    state.selections,
+                onSelect =
+                    onSelect,
+                onUnselect =
+                    onUnselect,
+                onMoveForward =
+                    onMoveForward,
+                onMoveBackward =
+                    onMoveBackward,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(
+                            innerPadding
+                        ),
+            )
+        } else {
+            StockList(
+                stocks =
+                    state.visibleStocks,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(
+                            innerPadding
+                        ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MainScreenLoading(
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier.fillMaxSize(),
+        contentAlignment =
+            Alignment.Center,
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun MainScreenError(
+    throwable: Throwable,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier.fillMaxSize(),
+        contentAlignment =
+            Alignment.Center,
+    ) {
+        Text(
+            text =
+                "Error loading data: " +
+                    throwable.message
+        )
+    }
+}
+
+
+===== .\app\src\test\kotlin\com\example\twsestockapp\ui\main\MainScreenViewModelTestFixture.kt =====
+package com.example.twsestockapp.ui.main
+
+import com.example.twsestockapp.data.DataRepository
+import com.example.twsestockapp.data.model.Stock
+import com.example.twsestockapp.data.selection.StockFieldSelection
+import com.example.twsestockapp.data.selection.StockFieldSelectionRepository
+import com.example.twsestockapp.data.selection.StockSelection
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+
+/**
+ * Objects required by one MainScreenViewModel unit test.
+ */
+internal data class MainScreenViewModelFixture(
+    val viewModel: MainScreenViewModel,
+)
+
+/**
+ * Creates a MainScreenViewModel backed by deterministic test
+ * repositories.
+ *
+ * Existing tests can omit [fieldSelections]. An empty field
+ * configuration is sufficient until field-specific ViewModel tests are
+ * added.
+ */
+internal fun createMainScreenViewModelFixture(
+    stocks: List<Stock> =
+        MAIN_SCREEN_FAKE_STOCKS,
+    selections: List<StockSelection> =
+        emptyList(),
+    fieldSelections: List<StockFieldSelection> =
+        emptyList(),
+): MainScreenViewModelFixture {
+
+    return MainScreenViewModelFixture(
+        viewModel =
+            MainScreenViewModel(
+                dataRepository =
+                    FakeDataRepository(
+                        stocks =
+                            stocks,
+                    ),
+                stockSelectionRepository =
+                    FakeStockSelectionRepository(
+                        initialSelections =
+                            selections,
+                    ),
+                stockFieldSelectionRepository =
+                    FakeStockFieldSelectionRepository(
+                        initialSelections =
+                            fieldSelections,
+                    ),
+            )
+    )
+}
+
+/**
+ * Starts observing uiState.
+ *
+ * MainScreenViewModel uses SharingStarted.WhileSubscribed, therefore
+ * tests need an active subscriber before upstream flows become active.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun TestScope.startCollectingUiState(
+    viewModel: MainScreenViewModel,
+) {
+    backgroundScope.launch {
+        viewModel.uiState.collect()
+    }
+
+    runCurrent()
+}
+
+/**
+ * Processes scheduled coroutine work and returns the current successful
+ * UI state.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun TestScope.successState(
+    viewModel: MainScreenViewModel,
+): MainScreenUiState.Success {
+
+    runCurrent()
+
+    val current =
+        viewModel.uiState.value
+
+    check(
+        current is
+            MainScreenUiState.Success
+    ) {
+        "Expected MainScreenUiState.Success but was $current"
+    }
+
+    return current
+}
+
+/**
+ * Deterministic fake implementation of DataRepository.
+ */
+private class FakeDataRepository(
+    stocks: List<Stock>,
+) : DataRepository {
+
+    override val data:
+        Flow<List<Stock>> =
+        flowOf(
+            stocks
+        )
+}
+
+/**
+ * Observable in-memory field-selection repository.
+ *
+ * This fake preserves continuous one-based DisplayOrder values.
+ */
+private class FakeStockFieldSelectionRepository(
+    initialSelections:
+        List<StockFieldSelection>,
+) : StockFieldSelectionRepository {
+
+    private val selectionState =
+        MutableStateFlow(
+            normalizeInitialSelections(
+                initialSelections
+            )
+        )
+
+    override val selections:
+        Flow<List<StockFieldSelection>> =
+        selectionState
+
+    override suspend fun select(
+        fieldKey: String,
+    ) {
+        if (
+            selectionState.value.any { selection ->
+                selection.FieldKey ==
+                    fieldKey
+            }
+        ) {
+            return
+        }
+
+        selectionState.value =
+            reindexPreservingOrder(
+                selectionState.value +
+                    StockFieldSelection(
+                        FieldKey =
+                            fieldKey,
+                        DisplayOrder =
+                            selectionState.value
+                                .size + 1,
+                    )
+            )
+    }
+
+    override suspend fun unselect(
+        fieldKey: String,
+    ) {
+        selectionState.value =
+            reindexPreservingOrder(
+                selectionState.value
+                    .filterNot { selection ->
+                        selection.FieldKey ==
+                            fieldKey
+                    }
+            )
+    }
+
+    override suspend fun moveForward(
+        fieldKey: String,
+    ) {
+        val ordered =
+            selectionState.value
+                .toMutableList()
+
+        val index =
+            ordered.indexOfFirst { selection ->
+                selection.FieldKey ==
+                    fieldKey
+            }
+
+        if (
+            index <= 0
+        ) {
+            return
+        }
+
+        val previous =
+            ordered[index - 1]
+
+        ordered[index - 1] =
+            ordered[index]
+
+        ordered[index] =
+            previous
+
+        selectionState.value =
+            reindexPreservingOrder(
+                ordered
+            )
+    }
+
+    override suspend fun moveBackward(
+        fieldKey: String,
+    ) {
+        val ordered =
+            selectionState.value
+                .toMutableList()
+
+        val index =
+            ordered.indexOfFirst { selection ->
+                selection.FieldKey ==
+                    fieldKey
+            }
+
+        if (
+            index < 0 ||
+            index >= ordered.lastIndex
+        ) {
+            return
+        }
+
+        val next =
+            ordered[index + 1]
+
+        ordered[index + 1] =
+            ordered[index]
+
+        ordered[index] =
+            next
+
+        selectionState.value =
+            reindexPreservingOrder(
+                ordered
+            )
+    }
+
+    override suspend fun replaceAll(
+        fieldKeys: List<String>,
+    ) {
+        selectionState.value =
+            fieldKeys
+                .distinct()
+                .mapIndexed {
+                        index,
+                        fieldKey ->
+
+                    StockFieldSelection(
+                        FieldKey =
+                            fieldKey,
+                        DisplayOrder =
+                            index + 1,
+                    )
+                }
+    }
+
+    override suspend fun clear() {
+        selectionState.value =
+            emptyList()
+    }
+
+    companion object {
+
+        private fun normalizeInitialSelections(
+            selections:
+                List<StockFieldSelection>,
+        ): List<StockFieldSelection> {
+
+            return reindexPreservingOrder(
+                selections.sortedBy { selection ->
+                    selection.DisplayOrder
+                }
+            )
+        }
+
+        private fun reindexPreservingOrder(
+            selections:
+                List<StockFieldSelection>,
+        ): List<StockFieldSelection> {
+
+            return selections.mapIndexed {
+                    index,
+                    selection ->
+
+                selection.copy(
+                    DisplayOrder =
+                        index + 1,
+                )
+            }
+        }
+    }
+}
+
+
