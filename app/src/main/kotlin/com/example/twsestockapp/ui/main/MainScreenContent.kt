@@ -19,20 +19,19 @@ import com.example.twse.stock.R
 import com.example.twsestockapp.ui.main.component.StockList
 import com.example.twsestockapp.ui.main.selection.StockFieldSelectionPanel
 import com.example.twsestockapp.ui.main.selection.StockSelectionPanel
+import com.example.twsestockapp.ui.main.sort.StockSortOption
 
 /**
  * Renders a successful main-screen state.
  *
- * Normal-mode navigation:
+ * Normal mode:
  *
  * - bottom-right edit button opens stock selection
- * - top-right menu opens Pager-field editing
+ * - Filter menu controls main Pager stock sorting
+ * - overflow menu opens Pager-field editing
  *
- * Field visibility terminology:
- *
- * - show restores a hidden Pager field
- * - hide removes a field from Pager presentation without deleting its
- *   persistent record or absolute DisplayOrder
+ * Filter sorting is presentation-only and never modifies persistent
+ * stock DisplayOrder.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +49,8 @@ internal fun MainScreenContent(
     onHideField: (String) -> Unit,
     onMoveFieldForward: (String) -> Unit,
     onMoveFieldBackward: (String) -> Unit,
+    onSelectStockSortOption:
+        (StockSortOption) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isEditing =
@@ -70,6 +71,10 @@ internal fun MainScreenContent(
                         editorMode =
                             editorMode,
                     ),
+                stockSortOption =
+                    state.stockSortOption,
+                onSelectStockSortOption =
+                    onSelectStockSortOption,
                 onOpenFieldEditor =
                     onOpenFieldEditor,
                 onCloseEditor =
@@ -166,6 +171,9 @@ internal fun MainScreenContent(
 private fun MainScreenTopBar(
     editorMode: MainScreenEditorMode,
     canCloseEditor: Boolean,
+    stockSortOption: StockSortOption,
+    onSelectStockSortOption:
+        (StockSortOption) -> Unit,
     onOpenFieldEditor: () -> Unit,
     onCloseEditor: () -> Unit,
 ) {
@@ -206,6 +214,19 @@ private fun MainScreenTopBar(
                     )
                 }
             } else {
+                /*
+                 * Main-screen presentation controls.
+                 *
+                 * Filter is intentionally unavailable while editing
+                 * persistent stock or field configuration.
+                 */
+                MainScreenFilterMenu(
+                    selectedOption =
+                        stockSortOption,
+                    onSelectOption =
+                        onSelectStockSortOption,
+                )
+
                 MainScreenMenu(
                     onEditFields =
                         onOpenFieldEditor,
@@ -229,12 +250,6 @@ private fun MainScreenTopBar(
 
 /**
  * Determines whether the active editor may be closed.
- *
- * Stock editing requires at least one selected stock.
- *
- * Field editing requires at least one visible Pager field. Hidden
- * fields remain persisted, so checking fieldSelections.isNotEmpty()
- * would no longer be sufficient.
  */
 private fun canCloseMainScreenEditor(
     state: MainScreenUiState.Success,

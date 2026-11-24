@@ -1,5 +1,6 @@
 ﻿package com.example.twsestockapp.ui.main
 
+import com.example.twsestockapp.ui.main.sort.StockSortOption
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -30,6 +31,15 @@ interface MainScreenViewModel {
     )
 
     fun clearSelectedStocks()
+
+    /**
+     * Changes the presentation sorting used by the main stock Pager.
+     *
+     * This operation does not modify persistent StockSelection order.
+     */
+    fun selectStockSortOption(
+        option: StockSortOption,
+    )
 
     /**
      * Restores an existing hidden Pager field at its persistent
@@ -63,9 +73,6 @@ interface MainScreenViewModel {
 
     /**
      * Replaces the complete field configuration.
-     *
-     * This remains available for controlled initialization and
-     * configuration replacement.
      */
     fun replaceStockFields(
         fieldKeys: List<String>,

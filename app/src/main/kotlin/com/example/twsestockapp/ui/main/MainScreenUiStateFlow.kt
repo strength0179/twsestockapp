@@ -3,6 +3,7 @@
 import com.example.twsestockapp.data.DataRepository
 import com.example.twsestockapp.data.selection.StockFieldSelectionRepository
 import com.example.twsestockapp.data.selection.StockSelectionRepository
+import com.example.twsestockapp.ui.main.sort.StockSortOption
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -10,8 +11,15 @@ import kotlinx.coroutines.flow.combine
 /**
  * Creates the combined MainScreen presentation-state stream.
  *
- * The explicit Flow<MainScreenUiState> return type allows the stream to
- * emit both Success and Error states.
+ * Sources:
+ *
+ * - stock data
+ * - persistent stock selection
+ * - persistent field selection
+ * - current stock sorting option
+ *
+ * Whenever one source changes, a new presentation state is created from
+ * the latest values of all four sources.
  */
 internal fun createMainScreenUiStateFlow(
     dataRepository: DataRepository,
@@ -19,6 +27,8 @@ internal fun createMainScreenUiStateFlow(
         StockSelectionRepository,
     stockFieldSelectionRepository:
         StockFieldSelectionRepository,
+    stockSortOption:
+        Flow<StockSortOption>,
 ): Flow<MainScreenUiState> {
 
     val successStates:
@@ -27,10 +37,12 @@ internal fun createMainScreenUiStateFlow(
             dataRepository.data,
             stockSelectionRepository.selections,
             stockFieldSelectionRepository.selections,
+            stockSortOption,
         ) {
                 allStocks,
                 selections,
-                fieldSelections ->
+                fieldSelections,
+                sortOption ->
 
             MainScreenStateFactory.createSuccess(
                 allStocks =
@@ -39,6 +51,8 @@ internal fun createMainScreenUiStateFlow(
                     selections,
                 fieldSelections =
                     fieldSelections,
+                stockSortOption =
+                    sortOption,
             )
         }
 

@@ -3,6 +3,8 @@
 import com.example.twsestockapp.data.DataRepository
 import com.example.twsestockapp.data.selection.StockFieldSelectionRepository
 import com.example.twsestockapp.data.selection.StockSelectionRepository
+import com.example.twsestockapp.ui.main.sort.StockSortOption
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Default production implementation of [MainScreenViewModel].
@@ -10,15 +12,24 @@ import com.example.twsestockapp.data.selection.StockSelectionRepository
  * UI-state lifecycle behavior is inherited from
  * [BaseMainScreenViewModel].
  *
- * This implementation routes UI commands to the appropriate
- * repository.
+ * Repository-backed commands are routed to their repositories.
+ *
+ * Stock sorting is presentation-only state and therefore remains inside
+ * this ViewModel rather than being persisted through
+ * StockSelectionRepository.
  */
 class DefaultMainScreenViewModel(
-    dataRepository: DataRepository,
+    dataRepository:
+        DataRepository,
     private val stockSelectionRepository:
         StockSelectionRepository,
     private val stockFieldSelectionRepository:
         StockFieldSelectionRepository,
+    private val stockSortOptionState:
+        MutableStateFlow<StockSortOption> =
+        MutableStateFlow(
+            StockSortOption.Default
+        ),
 ) : BaseMainScreenViewModel(
     sourceUiState =
         createMainScreenUiStateFlow(
@@ -28,6 +39,8 @@ class DefaultMainScreenViewModel(
                 stockSelectionRepository,
             stockFieldSelectionRepository =
                 stockFieldSelectionRepository,
+            stockSortOption =
+                stockSortOptionState,
         ),
 ) {
 
@@ -79,6 +92,19 @@ class DefaultMainScreenViewModel(
         launchCommand {
             stockSelectionRepository.clear()
         }
+    }
+
+    /**
+     * Sorting is synchronous presentation state.
+     *
+     * Updating the StateFlow causes createMainScreenUiStateFlow to emit
+     * a new Success state using the latest repository values.
+     */
+    override fun selectStockSortOption(
+        option: StockSortOption,
+    ) {
+        stockSortOptionState.value =
+            option
     }
 
     override fun showStockField(

@@ -159,6 +159,13 @@ internal fun MainScreenScreen(
                     )
                 },
 
+                onSelectStockSortOption = { option ->
+                    viewModel.selectStockSortOption(
+                        option =
+                            option,
+                    )
+                },
+
                 modifier =
                     modifier,
             )
@@ -174,4 +181,3 @@ internal fun MainScreenScreen(
         }
     }
 }
-
