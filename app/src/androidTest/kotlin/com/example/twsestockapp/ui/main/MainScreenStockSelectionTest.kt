@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
+import com.example.twsestockapp.data.selection.StockSelection
 import com.example.twsestockapp.ui.main.selection.SELECTED_STOCKS_LIST_TAG
 import com.example.twsestockapp.ui.main.selection.STOCK_CATALOG_LIST_TAG
 import com.example.twsestockapp.ui.theme.TWSEStockAppTheme
@@ -33,6 +34,8 @@ import org.junit.Test
  *
  * - presents selections in DisplayOrder
  * - handles selected-stock ordering
+ * - supports selected-stock removal
+ * - prevents removal of the final selected stock
  * - keeps its navigation title fixed above the scrolling list
  */
 class MainScreenStockSelectionTest {
@@ -404,10 +407,6 @@ class MainScreenStockSelectionTest {
     /**
      * The selected-stock title is structurally independent of its
      * LazyColumn and remains available as a navigation action.
-     *
-     * MAIN_SCREEN_TEST_STATE contains only two selected stocks, so this
-     * test does not pretend that the short selected list can perform a
-     * meaningful vertical scroll.
      */
     @Test
     fun selectedTitleRemainsAvailableAboveSelectedList() {
@@ -444,6 +443,109 @@ class MainScreenStockSelectionTest {
                 "查看已選股票"
             )
             .assertIsDisplayed()
+    }
+
+    /**
+     * When multiple stocks are selected, each selected-stock row exposes
+     * an enabled remove control.
+     */
+    @Test
+    fun selectedPageRemoveButtonsAreEnabledWhenMultipleStocksRemain() {
+        setStockEditorContent()
+
+        openSelectedStocksPage()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "移除自選股票 2454"
+            )
+            .assertIsEnabled()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "移除自選股票 2330"
+            )
+            .assertIsEnabled()
+    }
+
+    /**
+     * The selected-stock remove control reuses the existing unselect
+     * callback.
+     */
+    @Test
+    fun selectedPageRemoveButtonRequestsUnselection() {
+        var removedCode:
+            String? = null
+
+        setStockEditorContent(
+            onUnselect = { code ->
+                removedCode =
+                    code
+            },
+        )
+
+        openSelectedStocksPage()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "移除自選股票 2454"
+            )
+            .assertIsEnabled()
+            .performClick()
+
+        composeTestRule.runOnIdle {
+            assertEquals(
+                "2454",
+                removedCode,
+            )
+        }
+    }
+
+    /**
+     * Stock selection must never become empty through the selected-stock
+     * page.
+     *
+     * When only one stock remains, its remove control stays visible but
+     * is disabled.
+     */
+    @Test
+    fun finalSelectedStockCannotBeRemoved() {
+        val selectedStock =
+            MAIN_SCREEN_TEST_STOCKS
+                .first { stock ->
+                    stock.Code ==
+                        "2454"
+                }
+
+        val singleSelectionState =
+            MAIN_SCREEN_TEST_STATE.copy(
+                visibleStocks =
+                    listOf(
+                        selectedStock
+                    ),
+                selections =
+                    listOf(
+                        StockSelection(
+                            Code =
+                                "2454",
+                            DisplayOrder =
+                                1,
+                        )
+                    ),
+            )
+
+        setStockEditorContent(
+            state =
+                singleSelectionState,
+        )
+
+        openSelectedStocksPage()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "移除自選股票 2454"
+            )
+            .assertIsNotEnabled()
     }
 
     private fun openSelectedStocksPage() {
@@ -485,6 +587,9 @@ class MainScreenStockSelectionTest {
     }
 
     private fun setStockEditorContent(
+        state:
+            MainScreenUiState.Success =
+            MAIN_SCREEN_TEST_STATE,
         onSelect:
             (String) -> Unit = {},
         onUnselect:
@@ -498,7 +603,7 @@ class MainScreenStockSelectionTest {
             TWSEStockAppTheme {
                 MainScreenContent(
                     state =
-                        MAIN_SCREEN_TEST_STATE,
+                        state,
                     editorMode =
                         MainScreenEditorMode
                             .StockSelection,

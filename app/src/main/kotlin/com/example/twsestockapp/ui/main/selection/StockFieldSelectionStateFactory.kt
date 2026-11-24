@@ -2,6 +2,8 @@
 
 import com.example.twsestockapp.data.selection.StockFieldSelection
 import com.example.twsestockapp.ui.main.component.StockPagerPage
+import com.example.twsestockapp.ui.main.component.isEffectivelyVisible
+import com.example.twsestockapp.ui.main.component.isRequiredStockPagerField
 import com.example.twsestockapp.ui.main.component.stockPagerPages
 
 /**
@@ -10,21 +12,17 @@ import com.example.twsestockapp.ui.main.component.stockPagerPages
  *
  * Persistence and presentation ordering are intentionally different.
  *
- * Example persistent state:
+ * Required valuation fields:
  *
- * A absolute=1 visible
- * B absolute=2 hidden
- * C absolute=3 visible
- * D absolute=4 visible
+ * - peRatio
+ * - dividendYield
+ * - pbRatio
  *
- * Editor state:
+ * Required fields are always presented as visible, even when an older
+ * persistent row contains IsVisible=false.
  *
- * A visibleOrder=1
- * C visibleOrder=2
- * D visibleOrder=3
- * B visibleOrder=null
- *
- * The factory never modifies persistent DisplayOrder values.
+ * The factory never modifies persistent DisplayOrder or IsVisible
+ * values.
  */
 internal fun createStockFieldSelectionItemStates(
     selections: List<StockFieldSelection>,
@@ -45,7 +43,7 @@ internal fun createStockFieldSelectionItemStates(
         }
 
     /*
-     * DisplayOrder remains the authoritative absolute persistent order.
+     * DisplayOrder remains the authoritative persistent order.
      */
     val validOrderedSelections =
         selections
@@ -67,16 +65,22 @@ internal fun createStockFieldSelectionItemStates(
                 )
             }
 
+    /*
+     * Required valuation fields are effectively visible even when the
+     * persisted IsVisible value is false.
+     */
     val visibleSelections =
         validOrderedSelections
             .filter { resolved ->
-                resolved.selection.IsVisible
+                resolved.selection
+                    .isEffectivelyVisible()
             }
 
     val hiddenSelections =
         validOrderedSelections
             .filterNot { resolved ->
-                resolved.selection.IsVisible
+                resolved.selection
+                    .isEffectivelyVisible()
             }
 
     val visibleCount =
@@ -88,37 +92,34 @@ internal fun createStockFieldSelectionItemStates(
                     visibleIndex,
                     resolved ->
 
+                val isRequired =
+                    isRequiredStockPagerField(
+                        fieldKey =
+                            resolved.page.key,
+                    )
+
                 StockFieldSelectionItemState(
                     page =
                         resolved.page,
                     selection =
                         resolved.selection,
-
-                    /*
-                     * Presentation-only order.
-                     *
-                     * This intentionally differs from the persistent
-                     * DisplayOrder when hidden fields exist.
-                     */
                     visibleDisplayOrder =
                         visibleIndex + 1,
-
+                    /*
+                     * This is effective presentation visibility, not a
+                     * direct copy of persistent IsVisible.
+                     */
                     isVisible =
                         true,
-
+                    isRequired =
+                        isRequired,
                     canShow =
                         false,
-
-                    /*
-                     * Never allow the final visible Pager page to be
-                     * hidden.
-                     */
                     canHide =
-                        visibleCount > 1,
-
+                        !isRequired &&
+                            visibleCount > 1,
                     canMoveForward =
                         visibleIndex > 0,
-
                     canMoveBackward =
                         visibleIndex <
                             visibleSelections.lastIndex,
@@ -133,31 +134,18 @@ internal fun createStockFieldSelectionItemStates(
                         resolved.page,
                     selection =
                         resolved.selection,
-
-                    /*
-                     * Hidden rows are rendered as x rather than a
-                     * numeric visible order.
-                     */
                     visibleDisplayOrder =
                         null,
-
                     isVisible =
                         false,
-
+                    isRequired =
+                        false,
                     canShow =
                         true,
-
                     canHide =
                         false,
-
-                    /*
-                     * Hidden fields retain their absolute database
-                     * position but are not directly reorderable through
-                     * the editor.
-                     */
                     canMoveForward =
                         false,
-
                     canMoveBackward =
                         false,
                 )
@@ -166,10 +154,10 @@ internal fun createStockFieldSelectionItemStates(
     /*
      * Editor layout:
      *
-     * all visible rows first,
-     * followed by all hidden rows.
+     * all effectively visible rows first,
+     * followed by optional hidden rows.
      *
-     * Each group preserves absolute persistent order.
+     * Each group preserves persistent absolute order.
      */
     return visibleStates +
         hiddenStates

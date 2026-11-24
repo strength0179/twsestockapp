@@ -16,6 +16,9 @@ import org.junit.Test
 
 /**
  * Tests Pager-field visibility and ordering presentation.
+ *
+ * Required valuation fields remain effectively visible even when their
+ * persistent IsVisible value is false.
  */
 class MainScreenFieldSelectionTest {
 
@@ -23,21 +26,6 @@ class MainScreenFieldSelectionTest {
     val composeTestRule =
         createAndroidComposeRule<ComponentActivity>()
 
-    /**
-     * Absolute persistence:
-     *
-     * closingPrice 1 visible
-     * change       2 hidden
-     * tradeVolume  3 visible
-     * peRatio      4 visible
-     *
-     * Editor:
-     *
-     * closingPrice 1
-     * tradeVolume  2
-     * peRatio      3
-     * change       x
-     */
     @Test
     fun editorDisplaysVisibleFieldsFirstWithCompactVisibleOrder() {
         setFieldEditorContent(
@@ -49,42 +37,33 @@ class MainScreenFieldSelectionTest {
             .onNodeWithContentDescription(
                 "欄位顯示排序 1"
             )
-            .assertExists()
             .assertIsDisplayed()
 
         composeTestRule
             .onNodeWithContentDescription(
                 "欄位顯示排序 2"
             )
-            .assertExists()
             .assertIsDisplayed()
 
         composeTestRule
             .onNodeWithContentDescription(
                 "欄位顯示排序 3"
             )
-            .assertExists()
             .assertIsDisplayed()
 
         composeTestRule
             .onNodeWithContentDescription(
                 "顯示 漲跌"
             )
-            .assertExists()
             .assertIsDisplayed()
 
         composeTestRule
             .onNodeWithText(
                 "x"
             )
-            .assertExists()
             .assertIsDisplayed()
     }
 
-    /**
-     * Clicking a hidden field's x box requests show without changing
-     * its persistent absolute order in the UI layer.
-     */
     @Test
     fun clickingHiddenXRequestsShow() {
         var shownField:
@@ -113,9 +92,6 @@ class MainScreenFieldSelectionTest {
         }
     }
 
-    /**
-     * Clicking the circular multiplication button requests hide.
-     */
     @Test
     fun clickingCircularXRequestsHide() {
         var hiddenField:
@@ -145,12 +121,8 @@ class MainScreenFieldSelectionTest {
         }
     }
 
-    /**
-     * Hidden fields remain in the editor but cannot be reordered
-     * directly.
-     */
     @Test
-    fun hiddenFieldMovementButtonsAreDisabled() {
+    fun hiddenOptionalFieldMovementButtonsAreDisabled() {
         setFieldEditorContent(
             state =
                 visibilityState(),
@@ -160,31 +132,22 @@ class MainScreenFieldSelectionTest {
             .onNodeWithContentDescription(
                 "將 漲跌 往前移"
             )
-            .assertExists()
             .assertIsNotEnabled()
 
         composeTestRule
             .onNodeWithContentDescription(
                 "將 漲跌 往後移"
             )
-            .assertExists()
             .assertIsNotEnabled()
     }
 
-    /**
-     * Movement controls are determined from visible order, not absolute
-     * DisplayOrder.
-     */
     @Test
-    fun visibleMovementButtonsUseVisibleOrder() {
+    fun visibleMovementButtonsUseEffectiveVisibleOrder() {
         setFieldEditorContent(
             state =
                 visibilityState(),
         )
 
-        /*
-         * closingPrice is the first visible field.
-         */
         composeTestRule
             .onNodeWithContentDescription(
                 "將 收盤價 往前移"
@@ -197,10 +160,6 @@ class MainScreenFieldSelectionTest {
             )
             .assertIsEnabled()
 
-        /*
-         * tradeVolume is the middle visible field even though its
-         * absolute DisplayOrder is 3.
-         */
         composeTestRule
             .onNodeWithContentDescription(
                 "將 成交量 往前移"
@@ -213,9 +172,12 @@ class MainScreenFieldSelectionTest {
             )
             .assertIsEnabled()
 
-        /*
-         * peRatio is the final visible field.
-         */
+        composeTestRule
+            .onNodeWithContentDescription(
+                "將 本益比 往前移"
+            )
+            .assertIsEnabled()
+
         composeTestRule
             .onNodeWithContentDescription(
                 "將 本益比 往後移"
@@ -281,11 +243,8 @@ class MainScreenFieldSelectionTest {
         }
     }
 
-    /**
-     * The final remaining visible field cannot be hidden.
-     */
     @Test
-    fun finalVisibleFieldHideButtonIsDisabled() {
+    fun finalOptionalVisibleFieldHideButtonIsDisabled() {
         val state =
             MAIN_SCREEN_TEST_STATE.copy(
                 fieldSelections =
@@ -318,13 +277,199 @@ class MainScreenFieldSelectionTest {
             .onNodeWithContentDescription(
                 "收盤價 是最後一個顯示欄位"
             )
-            .assertExists()
             .assertIsNotEnabled()
     }
 
+    @Test
+    fun requiredValuationHideButtonsAreDisabled() {
+        setFieldEditorContent(
+            state =
+                requiredValuationState(
+                    persistedVisible =
+                        true,
+                ),
+        )
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "本益比 是必要欄位"
+            )
+            .assertIsNotEnabled()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "殖利率 是必要欄位"
+            )
+            .assertIsNotEnabled()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "股價淨值比 是必要欄位"
+            )
+            .assertIsNotEnabled()
+    }
+
+    @Test
+    fun requiredValuationFieldsRemainReorderable() {
+        setFieldEditorContent(
+            state =
+                requiredValuationState(
+                    persistedVisible =
+                        true,
+                ),
+        )
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "將 本益比 往前移"
+            )
+            .assertIsEnabled()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "將 本益比 往後移"
+            )
+            .assertIsEnabled()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "將 殖利率 往前移"
+            )
+            .assertIsEnabled()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "將 殖利率 往後移"
+            )
+            .assertIsEnabled()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "將 股價淨值比 往前移"
+            )
+            .assertIsEnabled()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "將 股價淨值比 往後移"
+            )
+            .assertIsNotEnabled()
+    }
+
+    @Test
+    fun optionalFieldRemainsHideableBesideRequiredFields() {
+        setFieldEditorContent(
+            state =
+                requiredValuationState(
+                    persistedVisible =
+                        true,
+                ),
+        )
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "隱藏 收盤價"
+            )
+            .assertIsEnabled()
+    }
+
     /**
-     * Field editor title and completion action remain available.
+     * Required valuation fields must be rendered as visible even when
+     * their persisted IsVisible values are false.
      */
+    @Test
+    fun persistedHiddenRequiredFieldsStillDisplayAsVisibleRows() {
+        setFieldEditorContent(
+            state =
+                allPersistedHiddenState(),
+        )
+
+        composeTestRule
+            .onNodeWithText(
+                "本益比"
+            )
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText(
+                "殖利率"
+            )
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText(
+                "股價淨值比"
+            )
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "欄位顯示排序 1"
+            )
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "欄位顯示排序 2"
+            )
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "欄位顯示排序 3"
+            )
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun persistedHiddenRequiredFieldsDoNotExposeRestoreControl() {
+        setFieldEditorContent(
+            state =
+                allPersistedHiddenState(),
+        )
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "顯示 本益比"
+            )
+            .assertDoesNotExist()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "顯示 殖利率"
+            )
+            .assertDoesNotExist()
+
+        composeTestRule
+            .onNodeWithContentDescription(
+                "顯示 股價淨值比"
+            )
+            .assertDoesNotExist()
+
+        /*
+         * Optional persisted-hidden field remains normally restorable.
+         */
+        composeTestRule
+            .onNodeWithContentDescription(
+                "顯示 收盤價"
+            )
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun allPersistedHiddenFieldsStillAllowEditorCompletionWhenRequiredFieldsExist() {
+        setFieldEditorContent(
+            state =
+                allPersistedHiddenState(),
+        )
+
+        composeTestRule
+            .onNodeWithText(
+                "完成"
+            )
+            .assertIsEnabled()
+    }
+
     @Test
     fun fieldEditorDisplaysTitleAndCompletionAction() {
         setFieldEditorContent(
@@ -336,14 +481,12 @@ class MainScreenFieldSelectionTest {
             .onNodeWithText(
                 "編輯資料欄位"
             )
-            .assertExists()
             .assertIsDisplayed()
 
         composeTestRule
             .onNodeWithText(
                 "完成"
             )
-            .assertExists()
             .assertIsEnabled()
     }
 
@@ -389,10 +532,95 @@ class MainScreenFieldSelectionTest {
         )
     }
 
+    private fun requiredValuationState(
+        persistedVisible: Boolean,
+    ): MainScreenUiState.Success {
+
+        return MAIN_SCREEN_TEST_STATE.copy(
+            fieldSelections =
+                listOf(
+                    field(
+                        fieldKey =
+                            "closingPrice",
+                        absoluteOrder =
+                            1,
+                        isVisible =
+                            true,
+                    ),
+                    field(
+                        fieldKey =
+                            "peRatio",
+                        absoluteOrder =
+                            2,
+                        isVisible =
+                            persistedVisible,
+                    ),
+                    field(
+                        fieldKey =
+                            "dividendYield",
+                        absoluteOrder =
+                            3,
+                        isVisible =
+                            persistedVisible,
+                    ),
+                    field(
+                        fieldKey =
+                            "pbRatio",
+                        absoluteOrder =
+                            4,
+                        isVisible =
+                            persistedVisible,
+                    ),
+                ),
+        )
+    }
+
+    private fun allPersistedHiddenState():
+        MainScreenUiState.Success {
+
+        return MAIN_SCREEN_TEST_STATE.copy(
+            fieldSelections =
+                listOf(
+                    field(
+                        fieldKey =
+                            "closingPrice",
+                        absoluteOrder =
+                            1,
+                        isVisible =
+                            false,
+                    ),
+                    field(
+                        fieldKey =
+                            "peRatio",
+                        absoluteOrder =
+                            2,
+                        isVisible =
+                            false,
+                    ),
+                    field(
+                        fieldKey =
+                            "dividendYield",
+                        absoluteOrder =
+                            3,
+                        isVisible =
+                            false,
+                    ),
+                    field(
+                        fieldKey =
+                            "pbRatio",
+                        absoluteOrder =
+                            4,
+                        isVisible =
+                            false,
+                    ),
+                ),
+        )
+    }
+
     private fun field(
         fieldKey: String,
         absoluteOrder: Int,
-        isVisible: Boolean,
+        isVisible: Boolean = true,
     ): StockFieldSelection {
 
         return StockFieldSelection(
@@ -431,13 +659,6 @@ class MainScreenFieldSelectionTest {
                     onUnselectStock = {},
                     onMoveStockForward = {},
                     onMoveStockBackward = {},
-
-                    /*
-                     * Current compatibility mapping:
-                     *
-                     * onShowField   -> show
-                     * onHideField -> hide
-                     */
                     onShowField =
                         onShowField,
                     onHideField =
@@ -451,4 +672,3 @@ class MainScreenFieldSelectionTest {
         }
     }
 }
-

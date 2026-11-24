@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
@@ -25,16 +26,22 @@ import androidx.compose.ui.unit.dp
  * Displays one Pager field inside the field-selection editor.
  *
  * Visible fields:
+ *
  * - show presentation order 1, 2, 3...
  * - expose shared movement controls
  * - expose a circular hide button
  *
+ * Required valuation fields:
+ *
+ * - remain visible
+ * - keep movement controls available
+ * - expose a disabled hide button
+ *
  * Hidden fields:
+ *
  * - show x instead of a numeric order
  * - clicking x requests restoration
  * - movement controls remain visible but disabled
- *
- * Persistent absolute ordering is not calculated here.
  */
 @Composable
 internal fun StockFieldSelectionItem(
@@ -119,6 +126,8 @@ internal fun StockFieldSelectionItem(
                     state.page.title,
                 enabled =
                     state.canHide,
+                isRequired =
+                    state.isRequired,
                 onClick =
                     onHide,
             )
@@ -216,15 +225,31 @@ private fun StockFieldVisibilityOrderBox(
 /**
  * Circular action used to hide a visible Pager field.
  *
- * The final remaining visible field keeps this control disabled.
+ * The control is disabled when:
+ *
+ * - the field is a required valuation field, or
+ * - the field is the final remaining visible field.
  */
 @Composable
 private fun StockFieldHideButton(
     pageTitle: String,
     enabled: Boolean,
+    isRequired: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val description =
+        when {
+            enabled ->
+                "隱藏 $pageTitle"
+
+            isRequired ->
+                "$pageTitle 是必要欄位"
+
+            else ->
+                "$pageTitle 是最後一個顯示欄位"
+        }
+
     FilledTonalIconButton(
         onClick =
             onClick,
@@ -235,11 +260,11 @@ private fun StockFieldHideButton(
                 .size(40.dp)
                 .semantics {
                     contentDescription =
-                        if (enabled) {
-                            "隱藏 $pageTitle"
-                        } else {
-                            "$pageTitle 是最後一個顯示欄位"
-                        }
+                        description
+
+                    if (!enabled) {
+                        disabled()
+                    }
                 },
         shape =
             CircleShape,
@@ -257,7 +282,8 @@ private fun StockFieldHideButton(
                 ),
     ) {
         Text(
-            text = "×",
+            text =
+                "×",
             style =
                 MaterialTheme
                     .typography

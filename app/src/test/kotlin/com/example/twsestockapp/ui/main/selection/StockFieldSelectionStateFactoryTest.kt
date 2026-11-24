@@ -9,26 +9,20 @@ import org.junit.Test
 
 /**
  * Pure JVM tests for Pager-field editor state conversion.
+ *
+ * Required valuation fields:
+ *
+ * - peRatio
+ * - dividendYield
+ * - pbRatio
+ *
+ * Required fields are effectively visible even when their persisted
+ * IsVisible value is false.
  */
 class StockFieldSelectionStateFactoryTest {
 
-    /**
-     * Persistent:
-     *
-     * closingPrice 1 visible
-     * change       2 hidden
-     * tradeVolume  3 visible
-     * peRatio      4 visible
-     *
-     * Editor:
-     *
-     * closingPrice 1
-     * tradeVolume  2
-     * peRatio      3
-     * change       x
-     */
     @Test
-    fun hiddenFieldsMoveToBottomAndVisibleOrderIsRenumbered() {
+    fun hiddenOptionalFieldsMoveToBottomAndVisibleOrderIsRenumbered() {
         val states =
             createStockFieldSelectionItemStates(
                 selections =
@@ -60,9 +54,6 @@ class StockFieldSelectionStateFactoryTest {
         )
     }
 
-    /**
-     * Presentation order does not modify absolute persistent order.
-     */
     @Test
     fun persistentAbsoluteOrdersRemainUnchanged() {
         val states =
@@ -85,7 +76,7 @@ class StockFieldSelectionStateFactoryTest {
     }
 
     @Test
-    fun hiddenFieldHasNoVisibleDisplayOrder() {
+    fun hiddenOptionalFieldHasExpectedState() {
         val hidden =
             createStockFieldSelectionItemStates(
                 selections =
@@ -93,8 +84,17 @@ class StockFieldSelectionStateFactoryTest {
             )
                 .last()
 
+        assertEquals(
+            "change",
+            hidden.page.key,
+        )
+
         assertFalse(
             hidden.isVisible
+        )
+
+        assertFalse(
+            hidden.isRequired
         )
 
         assertNull(
@@ -108,16 +108,6 @@ class StockFieldSelectionStateFactoryTest {
         assertFalse(
             hidden.canHide
         )
-    }
-
-    @Test
-    fun hiddenFieldMovementIsDisabled() {
-        val hidden =
-            createStockFieldSelectionItemStates(
-                selections =
-                    sampleSelections(),
-            )
-                .last()
 
         assertFalse(
             hidden.canMoveForward
@@ -129,7 +119,7 @@ class StockFieldSelectionStateFactoryTest {
     }
 
     @Test
-    fun visibleMovementUsesVisibleOrderNotAbsoluteOrder() {
+    fun visibleMovementUsesEffectiveVisibleOrder() {
         val states =
             createStockFieldSelectionItemStates(
                 selections =
@@ -171,7 +161,7 @@ class StockFieldSelectionStateFactoryTest {
     }
 
     @Test
-    fun finalVisibleFieldCannotBeHidden() {
+    fun finalOptionalVisibleFieldCannotBeHidden() {
         val states =
             createStockFieldSelectionItemStates(
                 selections =
@@ -203,27 +193,376 @@ class StockFieldSelectionStateFactoryTest {
         )
 
         assertFalse(
+            visible.isRequired
+        )
+
+        assertFalse(
             visible.canHide
         )
     }
 
     @Test
-    fun visibleFieldsCanBeHiddenWhenMoreThanOneIsVisible() {
+    fun optionalFieldsCanBeHiddenWhenMultipleFieldsAreEffectivelyVisible() {
         val states =
             createStockFieldSelectionItemStates(
                 selections =
                     sampleSelections(),
             )
 
-        val visibleStates =
-            states.filter { state ->
-                state.isVisible
+        val closingPrice =
+            states.first { state ->
+                state.page.key ==
+                    "closingPrice"
+            }
+
+        val tradeVolume =
+            states.first { state ->
+                state.page.key ==
+                    "tradeVolume"
             }
 
         assertTrue(
-            visibleStates.all { state ->
+            closingPrice.canHide
+        )
+
+        assertTrue(
+            tradeVolume.canHide
+        )
+    }
+
+    @Test
+    fun allThreeValuationFieldsAreRequired() {
+        val states =
+            createStockFieldSelectionItemStates(
+                selections =
+                    requiredValuationSelections(
+                        persistedVisible =
+                            true,
+                    ),
+            )
+
+        assertEquals(
+            listOf(
+                "peRatio",
+                "dividendYield",
+                "pbRatio",
+            ),
+            states.map { state ->
+                state.page.key
+            },
+        )
+
+        assertTrue(
+            states.all { state ->
+                state.isRequired
+            }
+        )
+
+        assertTrue(
+            states.all { state ->
+                state.isVisible
+            }
+        )
+
+        assertTrue(
+            states.none { state ->
                 state.canHide
             }
+        )
+    }
+
+    @Test
+    fun persistedHiddenRequiredFieldsAreStillEffectivelyVisible() {
+        val states =
+            createStockFieldSelectionItemStates(
+                selections =
+                    requiredValuationSelections(
+                        persistedVisible =
+                            false,
+                    ),
+            )
+
+        assertEquals(
+            3,
+            states.size,
+        )
+
+        assertTrue(
+            states.all { state ->
+                state.isRequired
+            }
+        )
+
+        assertTrue(
+            states.all { state ->
+                state.isVisible
+            }
+        )
+    }
+
+    @Test
+    fun persistedHiddenRequiredFieldsReceiveCompactVisibleOrder() {
+        val states =
+            createStockFieldSelectionItemStates(
+                selections =
+                    requiredValuationSelections(
+                        persistedVisible =
+                            false,
+                    ),
+            )
+
+        assertEquals(
+            listOf(
+                1,
+                2,
+                3,
+            ),
+            states.map { state ->
+                state.visibleDisplayOrder
+            },
+        )
+    }
+
+    @Test
+    fun persistedHiddenRequiredFieldsCannotShowOrHide() {
+        val states =
+            createStockFieldSelectionItemStates(
+                selections =
+                    requiredValuationSelections(
+                        persistedVisible =
+                            false,
+                    ),
+            )
+
+        assertTrue(
+            states.none { state ->
+                state.canShow
+            }
+        )
+
+        assertTrue(
+            states.none { state ->
+                state.canHide
+            }
+        )
+    }
+
+    @Test
+    fun persistedHiddenRequiredFieldsRemainReorderable() {
+        val states =
+            createStockFieldSelectionItemStates(
+                selections =
+                    requiredValuationSelections(
+                        persistedVisible =
+                            false,
+                    ),
+            )
+
+        val peRatio =
+            states[0]
+
+        val dividendYield =
+            states[1]
+
+        val pbRatio =
+            states[2]
+
+        assertFalse(
+            peRatio.canMoveForward
+        )
+
+        assertTrue(
+            peRatio.canMoveBackward
+        )
+
+        assertTrue(
+            dividendYield.canMoveForward
+        )
+
+        assertTrue(
+            dividendYield.canMoveBackward
+        )
+
+        assertTrue(
+            pbRatio.canMoveForward
+        )
+
+        assertFalse(
+            pbRatio.canMoveBackward
+        )
+    }
+
+    @Test
+    fun effectiveVisibilityDoesNotModifyPersistentIsVisible() {
+        val selections =
+            requiredValuationSelections(
+                persistedVisible =
+                    false,
+            )
+
+        val states =
+            createStockFieldSelectionItemStates(
+                selections =
+                    selections,
+            )
+
+        assertTrue(
+            states.all { state ->
+                state.isVisible
+            }
+        )
+
+        assertTrue(
+            selections.none { selection ->
+                selection.IsVisible
+            }
+        )
+
+        assertTrue(
+            states.none { state ->
+                state.selection.IsVisible
+            }
+        )
+    }
+
+    @Test
+    fun optionalPersistedHiddenFieldsRemainHiddenBesideRequiredFields() {
+        val states =
+            createStockFieldSelectionItemStates(
+                selections =
+                    listOf(
+                        field(
+                            fieldKey =
+                                "closingPrice",
+                            absoluteOrder =
+                                1,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            fieldKey =
+                                "peRatio",
+                            absoluteOrder =
+                                2,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            fieldKey =
+                                "change",
+                            absoluteOrder =
+                                3,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            fieldKey =
+                                "dividendYield",
+                            absoluteOrder =
+                                4,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            fieldKey =
+                                "pbRatio",
+                            absoluteOrder =
+                                5,
+                            isVisible =
+                                false,
+                        ),
+                    ),
+            )
+
+        val visibleKeys =
+            states
+                .filter { state ->
+                    state.isVisible
+                }
+                .map { state ->
+                    state.page.key
+                }
+
+        val hiddenKeys =
+            states
+                .filterNot { state ->
+                    state.isVisible
+                }
+                .map { state ->
+                    state.page.key
+                }
+
+        assertEquals(
+            listOf(
+                "peRatio",
+                "dividendYield",
+                "pbRatio",
+            ),
+            visibleKeys,
+        )
+
+        assertEquals(
+            listOf(
+                "closingPrice",
+                "change",
+            ),
+            hiddenKeys,
+        )
+    }
+
+    @Test
+    fun requiredFieldsKeepPersistentAbsoluteOrderWhenForcedVisible() {
+        val states =
+            createStockFieldSelectionItemStates(
+                selections =
+                    listOf(
+                        field(
+                            fieldKey =
+                                "pbRatio",
+                            absoluteOrder =
+                                3,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            fieldKey =
+                                "peRatio",
+                            absoluteOrder =
+                                1,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            fieldKey =
+                                "dividendYield",
+                            absoluteOrder =
+                                2,
+                            isVisible =
+                                false,
+                        ),
+                    ),
+            )
+
+        assertEquals(
+            listOf(
+                "peRatio",
+                "dividendYield",
+                "pbRatio",
+            ),
+            states.map { state ->
+                state.page.key
+            },
+        )
+
+        assertEquals(
+            listOf(
+                1,
+                2,
+                3,
+            ),
+            states.map { state ->
+                state.selection.DisplayOrder
+            },
         )
     }
 
@@ -264,10 +603,6 @@ class StockFieldSelectionStateFactoryTest {
             },
         )
 
-        /*
-         * UI visible order is compact even though the persistent
-         * absolute order contains a gap caused by the unknown row.
-         */
         assertEquals(
             listOf(
                 1,
@@ -314,6 +649,38 @@ class StockFieldSelectionStateFactoryTest {
                     4,
                 isVisible =
                     true,
+            ),
+        )
+    }
+
+    private fun requiredValuationSelections(
+        persistedVisible: Boolean,
+    ): List<StockFieldSelection> {
+
+        return listOf(
+            field(
+                fieldKey =
+                    "peRatio",
+                absoluteOrder =
+                    1,
+                isVisible =
+                    persistedVisible,
+            ),
+            field(
+                fieldKey =
+                    "dividendYield",
+                absoluteOrder =
+                    2,
+                isVisible =
+                    persistedVisible,
+            ),
+            field(
+                fieldKey =
+                    "pbRatio",
+                absoluteOrder =
+                    3,
+                isVisible =
+                    persistedVisible,
             ),
         )
     }

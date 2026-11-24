@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
+import com.example.twsestockapp.ui.main.component.hasEffectivelyVisibleStockPagerField
 
 /**
  * Stateful main-screen entry point.
@@ -54,19 +55,16 @@ internal fun MainScreenScreen(
                     state,
                 editorMode =
                     effectiveEditorMode,
-
                 onOpenStockEditor = {
                     editorMode =
                         MainScreenEditorMode
                             .StockSelection
                 },
-
                 onOpenFieldEditor = {
                     editorMode =
                         MainScreenEditorMode
                             .FieldSelection
                 },
-
                 onCloseEditor = {
                     val canClose =
                         when (
@@ -79,10 +77,10 @@ internal fun MainScreenScreen(
 
                             MainScreenEditorMode
                                 .FieldSelection ->
-                                state.fieldSelections
-                                    .any { selection ->
-                                        selection.IsVisible
-                                    }
+                                hasEffectivelyVisibleStockPagerField(
+                                    selections =
+                                        state.fieldSelections,
+                                )
 
                             MainScreenEditorMode
                                 .None ->
@@ -94,7 +92,6 @@ internal fun MainScreenScreen(
                             MainScreenEditorMode.None
                     }
                 },
-
                 onSelectStock = { code ->
                     editorMode =
                         MainScreenEditorMode
@@ -105,28 +102,24 @@ internal fun MainScreenScreen(
                             code,
                     )
                 },
-
                 onUnselectStock = { code ->
                     viewModel.unselectStock(
                         code =
                             code,
                     )
                 },
-
                 onMoveStockForward = { code ->
                     viewModel.moveStockForward(
                         code =
                             code,
                     )
                 },
-
                 onMoveStockBackward = { code ->
                     viewModel.moveStockBackward(
                         code =
                             code,
                     )
                 },
-
                 onShowField = { fieldKey ->
                     editorMode =
                         MainScreenEditorMode
@@ -137,35 +130,30 @@ internal fun MainScreenScreen(
                             fieldKey,
                     )
                 },
-
                 onHideField = { fieldKey ->
                     viewModel.hideStockField(
                         fieldKey =
                             fieldKey,
                     )
                 },
-
                 onMoveFieldForward = { fieldKey ->
                     viewModel.moveStockFieldForward(
                         fieldKey =
                             fieldKey,
                     )
                 },
-
                 onMoveFieldBackward = { fieldKey ->
                     viewModel.moveStockFieldBackward(
                         fieldKey =
                             fieldKey,
                     )
                 },
-
                 onSelectStockSortOption = { option ->
                     viewModel.selectStockSortOption(
                         option =
                             option,
                     )
                 },
-
                 modifier =
                     modifier,
             )

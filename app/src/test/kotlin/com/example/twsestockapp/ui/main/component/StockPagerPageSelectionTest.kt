@@ -2,11 +2,21 @@
 
 import com.example.twsestockapp.data.selection.StockFieldSelection
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Pure JVM tests for [resolveStockPagerPages].
+ *
+ * Required valuation fields:
+ *
+ * - peRatio
+ * - dividendYield
+ * - pbRatio
+ *
+ * These fields are always effectively visible regardless of persisted
+ * IsVisible.
  */
 class StockPagerPageSelectionTest {
 
@@ -40,7 +50,7 @@ class StockPagerPageSelectionTest {
     }
 
     @Test
-    fun onlySelectedFieldsAreReturned() {
+    fun selectedFieldsAreReturned() {
         val pages =
             resolveStockPagerPages(
                 selections =
@@ -138,22 +148,8 @@ class StockPagerPageSelectionTest {
         )
     }
 
-    /**
-     * Absolute persistent order:
-     *
-     * closingPrice 1 visible
-     * change       2 hidden
-     * tradeVolume  3 visible
-     * peRatio      4 visible
-     *
-     * Pager:
-     *
-     * closingPrice
-     * tradeVolume
-     * peRatio
-     */
     @Test
-    fun hiddenFieldIsExcludedWithoutRenumberingPersistentOrder() {
+    fun optionalHiddenFieldIsExcludedWithoutRenumberingPersistentOrder() {
         val pages =
             resolveStockPagerPages(
                 selections =
@@ -187,21 +183,8 @@ class StockPagerPageSelectionTest {
         )
     }
 
-    /**
-     * This represents the DAO result after:
-     *
-     * A1 B2(hidden) C3 D4
-     *
-     * moveForward(C)
-     *
-     * C1 A2 B3(hidden) D4
-     *
-     * Pager must therefore become:
-     *
-     * C A D
-     */
     @Test
-    fun hiddenFieldAbsoluteOrderStillInfluencesMovedVisiblePages() {
+    fun optionalHiddenFieldAbsoluteOrderStillInfluencesMovedVisiblePages() {
         val pages =
             resolveStockPagerPages(
                 selections =
@@ -235,16 +218,8 @@ class StockPagerPageSelectionTest {
         )
     }
 
-    /**
-     * Restoring the hidden B at its preserved shifted absolute position
-     * immediately places it back between A and D.
-     *
-     * Absolute order:
-     *
-     * C1 A2 B3 D4
-     */
     @Test
-    fun restoredFieldReturnsAtItsPersistentAbsolutePosition() {
+    fun restoredOptionalFieldReturnsAtPersistentAbsolutePosition() {
         val pages =
             resolveStockPagerPages(
                 selections =
@@ -280,7 +255,7 @@ class StockPagerPageSelectionTest {
     }
 
     @Test
-    fun allHiddenFieldsReturnNoPagerPages() {
+    fun allOptionalHiddenFieldsReturnNoPagerPages() {
         val pages =
             resolveStockPagerPages(
                 selections =
@@ -302,6 +277,189 @@ class StockPagerPageSelectionTest {
 
         assertTrue(
             pages.isEmpty()
+        )
+    }
+
+    /**
+     * Core invariant:
+     *
+     * Mandatory valuation pages are returned even when persistence says
+     * IsVisible=false.
+     */
+    @Test
+    fun persistedHiddenRequiredValuationFieldsRemainInPager() {
+        val pages =
+            resolveStockPagerPages(
+                selections =
+                    listOf(
+                        field(
+                            "peRatio",
+                            1,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            "dividendYield",
+                            2,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            "pbRatio",
+                            3,
+                            isVisible =
+                                false,
+                        ),
+                    ),
+            )
+
+        assertKeys(
+            pages,
+            "peRatio",
+            "dividendYield",
+            "pbRatio",
+        )
+    }
+
+    @Test
+    fun requiredValuationFieldsUsePersistentDisplayOrderWhenForcedVisible() {
+        val pages =
+            resolveStockPagerPages(
+                selections =
+                    listOf(
+                        field(
+                            "pbRatio",
+                            3,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            "peRatio",
+                            1,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            "dividendYield",
+                            2,
+                            isVisible =
+                                false,
+                        ),
+                    ),
+            )
+
+        assertKeys(
+            pages,
+            "peRatio",
+            "dividendYield",
+            "pbRatio",
+        )
+    }
+
+    @Test
+    fun requiredAndOptionalVisibilityRulesCanCoexist() {
+        val pages =
+            resolveStockPagerPages(
+                selections =
+                    listOf(
+                        field(
+                            "closingPrice",
+                            1,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            "peRatio",
+                            2,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            "change",
+                            3,
+                            isVisible =
+                                true,
+                        ),
+                        field(
+                            "dividendYield",
+                            4,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            "tradeVolume",
+                            5,
+                            isVisible =
+                                false,
+                        ),
+                        field(
+                            "pbRatio",
+                            6,
+                            isVisible =
+                                false,
+                        ),
+                    ),
+            )
+
+        /*
+         * closingPrice and tradeVolume remain hidden.
+         *
+         * All mandatory valuation fields are present.
+         */
+        assertKeys(
+            pages,
+            "peRatio",
+            "change",
+            "dividendYield",
+            "pbRatio",
+        )
+    }
+
+    @Test
+    fun resolvingRequiredVisibilityDoesNotMutatePersistedSelections() {
+        val selections =
+            listOf(
+                field(
+                    "peRatio",
+                    1,
+                    isVisible =
+                        false,
+                ),
+                field(
+                    "dividendYield",
+                    2,
+                    isVisible =
+                        false,
+                ),
+                field(
+                    "pbRatio",
+                    3,
+                    isVisible =
+                        false,
+                ),
+            )
+
+        val pages =
+            resolveStockPagerPages(
+                selections =
+                    selections,
+            )
+
+        assertEquals(
+            3,
+            pages.size,
+        )
+
+        assertFalse(
+            selections[0].IsVisible
+        )
+
+        assertFalse(
+            selections[1].IsVisible
+        )
+
+        assertFalse(
+            selections[2].IsVisible
         )
     }
 

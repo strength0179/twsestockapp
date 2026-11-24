@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
  *
  * - selected stocks ordered by DisplayOrder
  * - handles selected-stock ordering
+ * - allows removal while at least two stocks remain
  * - complete stock catalog is located to the left
  *
  * Both title rows use the same fixed height and are outside their
@@ -139,6 +140,8 @@ internal fun StockSelectionPanel(
                         selectedEntries,
                     selectedCount =
                         selectedEntries.size,
+                    onUnselect =
+                        onUnselect,
                     onMoveForward =
                         onMoveForward,
                     onMoveBackward =
@@ -228,20 +231,26 @@ private fun StockCatalogPage(
 }
 
 /**
- * Selected-stock ordering page.
+ * Selected-stock ordering and removal page.
  *
  * The title remains fixed while only the selected-stock LazyColumn
  * scrolls.
+ *
+ * At least one selected stock must always remain.
  */
 @Composable
 private fun SelectedStocksPage(
     selectedEntries:
         List<SelectedStockEntry>,
     selectedCount: Int,
+    onUnselect: (String) -> Unit,
     onMoveForward: (String) -> Unit,
     onMoveBackward: (String) -> Unit,
     onContinueAdding: () -> Unit,
 ) {
+    val canRemove =
+        selectedEntries.size > 1
+
     Column(
         modifier =
             Modifier.fillMaxSize(),
@@ -289,6 +298,8 @@ private fun SelectedStocksPage(
                         index >= 0 &&
                             index <
                                 selectedEntries.lastIndex,
+                    canRemove =
+                        canRemove,
                     onMoveForward = {
                         onMoveForward(
                             entry.stock.Code
@@ -296,6 +307,11 @@ private fun SelectedStocksPage(
                     },
                     onMoveBackward = {
                         onMoveBackward(
+                            entry.stock.Code
+                        )
+                    },
+                    onRemove = {
+                        onUnselect(
                             entry.stock.Code
                         )
                     },

@@ -32,7 +32,8 @@ import com.example.twsestockapp.data.selection.StockSelection
  * - clicking an empty box selects the stock
  * - clicking a numbered box unselects the stock
  *
- * Reordering belongs exclusively to StockSelectionDrawer.
+ * Reordering and dedicated removal controls belong to the selected-stock
+ * Pager page.
  */
 @Composable
 internal fun StockSelectionItem(

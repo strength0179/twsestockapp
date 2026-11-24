@@ -8,12 +8,13 @@ import com.example.twsestockapp.data.selection.StockFieldSelection
  *
  * Rules:
  *
- * - hidden fields do not become Pager pages
- * - visible fields are ordered by absolute DisplayOrder
+ * - required valuation fields are always returned
+ * - optional hidden fields do not become Pager pages
+ * - effectively visible fields are ordered by absolute DisplayOrder
  * - unknown persisted keys are ignored
  *
- * Hidden fields retain their absolute DisplayOrder in persistence, but
- * that order is not renumbered here.
+ * Required visibility is a presentation rule. This resolver does not
+ * modify persistent IsVisible or DisplayOrder values.
  */
 internal fun resolveStockPagerPages(
     selections: List<StockFieldSelection>,
@@ -36,7 +37,7 @@ internal fun resolveStockPagerPages(
     return selections
         .asSequence()
         .filter { selection ->
-            selection.IsVisible
+            selection.isEffectivelyVisible()
         }
         .sortedBy { selection ->
             selection.DisplayOrder

@@ -11,7 +11,9 @@ import com.example.twsestockapp.ui.main.component.StockPagerPage
  * [visibleDisplayOrder] is presentation-only:
  *
  * - visible field -> 1, 2, 3...
- * - hidden field  -> null
+ * - hidden field -> null
+ *
+ * [isRequired] means the field must remain visible and cannot be hidden.
  *
  * visibleDisplayOrder must never be written back to persistence.
  */
@@ -20,6 +22,7 @@ internal data class StockFieldSelectionItemState(
     val selection: StockFieldSelection,
     val visibleDisplayOrder: Int?,
     val isVisible: Boolean,
+    val isRequired: Boolean,
     val canShow: Boolean,
     val canHide: Boolean,
     val canMoveForward: Boolean,

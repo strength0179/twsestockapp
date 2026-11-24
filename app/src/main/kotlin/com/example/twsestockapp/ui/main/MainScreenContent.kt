@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.example.twse.stock.R
 import com.example.twsestockapp.ui.main.component.StockList
+import com.example.twsestockapp.ui.main.component.hasEffectivelyVisibleStockPagerField
 import com.example.twsestockapp.ui.main.selection.StockFieldSelectionPanel
 import com.example.twsestockapp.ui.main.selection.StockSelectionPanel
 import com.example.twsestockapp.ui.main.sort.StockSortOption
@@ -30,8 +31,8 @@ import com.example.twsestockapp.ui.main.sort.StockSortOption
  * - Filter menu controls main Pager stock sorting
  * - overflow menu opens Pager-field editing
  *
- * Filter sorting is presentation-only and never modifies persistent
- * stock DisplayOrder.
+ * Required valuation Pager fields are treated as visible regardless of
+ * an older persisted IsVisible=false value.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,7 +94,8 @@ internal fun MainScreenContent(
                         },
                 ) {
                     Text(
-                        text = "編輯",
+                        text =
+                            "編輯",
                     )
                 }
             }
@@ -210,16 +212,11 @@ private fun MainScreenTopBar(
                         canCloseEditor,
                 ) {
                     Text(
-                        text = "完成",
+                        text =
+                            "完成",
                     )
                 }
             } else {
-                /*
-                 * Main-screen presentation controls.
-                 *
-                 * Filter is intentionally unavailable while editing
-                 * persistent stock or field configuration.
-                 */
                 MainScreenFilterMenu(
                     selectedOption =
                         stockSortOption,
@@ -255,6 +252,7 @@ private fun canCloseMainScreenEditor(
     state: MainScreenUiState.Success,
     editorMode: MainScreenEditorMode,
 ): Boolean {
+
     return when (editorMode) {
         MainScreenEditorMode.None ->
             true
@@ -264,9 +262,9 @@ private fun canCloseMainScreenEditor(
                 .isNotEmpty()
 
         MainScreenEditorMode.FieldSelection ->
-            state.fieldSelections
-                .any { selection ->
-                    selection.IsVisible
-                }
+            hasEffectivelyVisibleStockPagerField(
+                selections =
+                    state.fieldSelections,
+            )
     }
 }
